@@ -1,0 +1,28 @@
+#include<Uduino.h>
+Uduino uduino("uduinoBoard"); // Declare and name your object
+
+const int SW_pin = 2; // Taster-Pin
+const int X_pin = A0; // X-Ausgang
+const int Y_pin = A1; // Y-Ausgang
+
+void setup() {
+pinMode(SW_pin, INPUT);
+digitalWrite(SW_pin, HIGH);
+Serial.begin(115200);
+}
+
+void loop() {
+  uduino.update();
+  if (uduino.isConnected()){
+    //uduino.print("Taster: ");
+    uduino.print(digitalRead(SW_pin));
+    uduino.print("|");
+    //uduino.print("X-Achse: ");
+    uduino.print(analogRead(X_pin));
+    uduino.print("|");
+    //uduino.print("Y-Achse: ");
+    uduino.println(analogRead(Y_pin));
+    //uduino.print("\n\n");
+  }
+delay(100);
+}
