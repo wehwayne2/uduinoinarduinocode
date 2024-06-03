@@ -5,6 +5,8 @@ Uduino uduino("uduinoBoard"); // Declare and name your object
 
 MPU6050 mpu;
 
+const int lightSensorPin = A0; // Analog pin connected to the light sensor
+
 void setup() {
   Serial.begin(9600);
 
@@ -20,6 +22,9 @@ void loop() {
   if (uduino.isConnected()){
     int16_t ax, ay, az;
     int16_t gx, gy, gz;
+
+    int lightValue = analogRead(lightSensorPin);
+    
     mpu.getAcceleration(&ax, &ay, &az);
     mpu.getRotation(&gx, &gy, &gz);
     uduino.print(ax);
@@ -32,7 +37,9 @@ void loop() {
     uduino.print("|");
     uduino.print(gy);
     uduino.print("|");
-    uduino.println(gz);
+    uduino.print(gz);
+    uduino.print("|");
+    uduino.println(lightValue);
   }
   delay(100);
   /*int16_t ax, ay, az;
