@@ -1,0 +1,55 @@
+#include <Wire.h>
+#include <MPU6050.h>
+#include<Uduino.h>
+Uduino uduino("uduinoBoard"); // Declare and name your object
+
+MPU6050 mpu;
+
+void setup() {
+  Serial.begin(9600);
+
+  Wire.begin();
+  
+  mpu.initialize();
+  
+  mpu.initialize();
+}
+
+void loop() {
+  uduino.update();
+  if (uduino.isConnected()){
+    int16_t ax, ay, az;
+    int16_t gx, gy, gz;
+    mpu.getAcceleration(&ax, &ay, &az);
+    mpu.getRotation(&gx, &gy, &gz);
+    uduino.print(ax);
+    uduino.print("|");
+    uduino.print(ay);
+    uduino.print("|");
+    uduino.print(az);
+    uduino.print("|");
+    uduino.print(gx);
+    uduino.print("|");
+    uduino.print(gy);
+    uduino.print("|");
+    uduino.println(gz);
+  }
+  delay(100);
+  /*int16_t ax, ay, az;
+  int16_t gx, gy, gz;
+
+  mpu.getAcceleration(&ax, &ay, &az);
+  mpu.getRotation(&gx, &gy, &gz);
+
+  Serial.print("AX = "); Serial.print(ax);
+  Serial.print(", AY = "); Serial.print(ay);
+  Serial.print(", AZ = "); Serial.println(az);
+
+  Serial.print("Rotation: ");
+  Serial.print("RX = "); Serial.print(gx);
+  Serial.print(", RY = "); Serial.print(gy);
+  Serial.print(", RZ = "); Serial.println(gz);
+
+  delay(100); // Wait for 1 second before reading again
+  */
+}
