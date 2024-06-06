@@ -2,19 +2,42 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include<Uduino.h>
-Uduino uduino("uduinoBoard"); // Declare and name your object
+#include <Servo.h>
 
+Uduino uduino("uduinoBoard"); // Declare and name your object
 Adafruit_MPU6050 mpu;
 
 const int lightSensorPin = A0; // Analog pin connected to the light sensor
 
+#define MAXSERVOS 8
+Servo servos[MAXSERVOS];
+int servoPinMap[MAXSERVOS];
+
 void setup() {
   Serial.begin(9600);
 
-while (!Serial)
+#if defined (__AVR_ATmega32U4__) // Leonardo
+  while (!Serial) {}
+#elif defined(__PIC32MX__)
+  delay(1000);
+#endif
+
+  // Initialize Uduino commands
+  uduino.addCommand("s", SetMode);
+  uduino.addCommand("d", WritePinDigital);
+  uduino.addCommand("a", WritePinAnalog);
+  uduino.addCommand("rd", ReadDigitalPin);
+  uduino.addCommand("r", ReadAnalogPin);
+  uduino.addCommand("br", BundleReadPin);
+  uduino.addCommand("b", ReadBundle);
+  uduino.addInitFunction(DisconnectAllServos);
+  uduino.addDisconnectedFunction(DisconnectAllServos);
+
+  // Initialize MPU6050
+  while (!Serial)
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
 
-  // Try to initialize!
+  // Try to initialize MPU6050
   if (!mpu.begin()) {
     while (1) {
       delay(10);
@@ -22,54 +45,18 @@ while (!Serial)
   }
 
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-  switch (mpu.getAccelerometerRange()) {
-  case MPU6050_RANGE_2_G:
-    break;
-  case MPU6050_RANGE_4_G:
-    break;
-  case MPU6050_RANGE_8_G:
-    break;
-  case MPU6050_RANGE_16_G:
-    break;
-  }
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  switch (mpu.getGyroRange()) {
-  case MPU6050_RANGE_250_DEG:
-    break;
-  case MPU6050_RANGE_500_DEG:
-    break;
-  case MPU6050_RANGE_1000_DEG:
-    break;
-  case MPU6050_RANGE_2000_DEG:
-    break;
-  }
-
   mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
-  switch (mpu.getFilterBandwidth()) {
-  case MPU6050_BAND_260_HZ:
-    break;
-  case MPU6050_BAND_184_HZ:
-    break;
-  case MPU6050_BAND_94_HZ:
-    break;
-  case MPU6050_BAND_44_HZ:
-    break;
-  case MPU6050_BAND_21_HZ:
-    break;
-  case MPU6050_BAND_10_HZ:
-    break;
-  case MPU6050_BAND_5_HZ:
-    break;
-  }
+
   delay(100);
 }
 
 void loop() {
   uduino.update();
-  if (uduino.isConnected()){
-    
+
+  if (uduino.isConnected()) {
     int lightValue = analogRead(lightSensorPin);
-    
+
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
 
@@ -85,22 +72,182 @@ void loop() {
     uduino.print("|");
     uduino.println(lightValue);
   }
+
   delay(100);
-  /*int16_t ax, ay, az;
-  int16_t gx, gy, gz;
+}
 
-  mpu.getAcceleration(&ax, &ay, &az);
-  mpu.getRotation(&gx, &gy, &gz);
+void ReadBundle() {
+  char *arg = NULL;
+  char *number = NULL;
+  number = uduino.next();
+  int len = 0;
+  if (number != NULL)
+    len = atoi(number);
+  for (int i = 0; i < len; i++) {
+    uduino.launchCommand(arg);
+  }
+}
 
-  Serial.print("AX = "); Serial.print(ax);
-  Serial.print(", AY = "); Serial.print(ay);
-  Serial.print(", AZ = "); Serial.println(az);
+void SetMode() {
+  int pinToMap = 100; // 100 is never reached
+  char *arg = NULL;
+  arg = uduino.next();
+  if (arg != NULL) {
+    pinToMap = atoi(arg);
+  }
+  int type;
+  arg = uduino.next();
+  if (arg != NULL) {
+    type = atoi(arg);
+    PinSetMode(pinToMap, type);
+  }
+}
 
-  Serial.print("Rotation: ");
-  Serial.print("RX = "); Serial.print(gx);
-  Serial.print(", RY = "); Serial.print(gy);
-  Serial.print(", RZ = "); Serial.println(gz);
+void PinSetMode(int pin, int type) {
+  if (type != 4)
+    DisconnectServo(pin);
 
-  delay(100); // Wait for 1 second before reading again
-  */
+  switch (type) {
+    case 0: // Output
+      pinMode(pin, OUTPUT);
+      break;
+    case 1: // PWM
+      pinMode(pin, OUTPUT);
+      break;
+    case 2: // Analog
+      pinMode(pin, INPUT);
+      break;
+    case 3: // Input_Pullup
+      pinMode(pin, INPUT_PULLUP);
+      break;
+    case 4: // Servo
+      SetupServo(pin);
+      break;
+  }
+}
+
+void WritePinAnalog() {
+  int pinToMap = 100;
+  char *arg = NULL;
+  arg = uduino.next();
+  if (arg != NULL) {
+    pinToMap = atoi(arg);
+  }
+
+  int valueToWrite;
+  arg = uduino.next();
+  if (arg != NULL) {
+    valueToWrite = atoi(arg);
+
+    if (ServoConnectedPin(pinToMap)) {
+      UpdateServo(pinToMap, valueToWrite);
+    } else {
+      analogWrite(pinToMap, valueToWrite);
+    }
+  }
+}
+
+void WritePinDigital() {
+  int pinToMap = -1;
+  char *arg = NULL;
+  arg = uduino.next();
+  if (arg != NULL)
+    pinToMap = atoi(arg);
+
+  int writeValue;
+  arg = uduino.next();
+  if (arg != NULL && pinToMap != -1) {
+    writeValue = atoi(arg);
+    digitalWrite(pinToMap, writeValue);
+  }
+}
+
+void ReadAnalogPin() {
+  int pinToRead = -1;
+  char *arg = NULL;
+  arg = uduino.next();
+  if (arg != NULL) {
+    pinToRead = atoi(arg);
+    if (pinToRead != -1)
+      printValue(pinToRead, analogRead(pinToRead));
+  }
+}
+
+void ReadDigitalPin() {
+  int pinToRead = -1;
+  char *arg = NULL;
+  arg = uduino.next();
+  if (arg != NULL) {
+    pinToRead = atoi(arg);
+  }
+
+  if (pinToRead != -1)
+    printValue(pinToRead, digitalRead(pinToRead));
+}
+
+void BundleReadPin() {
+  int pinToRead = -1;
+  char *arg = NULL;
+  arg = uduino.next();
+  if (arg != NULL) {
+    pinToRead = atoi(arg);
+    if (pinToRead != -1) {
+      if (pinToRead < 13)
+        printValue(pinToRead, digitalRead(pinToRead));
+      else
+        printValue(pinToRead, analogRead(pinToRead));
+    }
+  }
+}
+
+void printValue(int pin, int targetValue) {
+  uduino.print(pin);
+  uduino.print(" "); // <- Change this with Uduino delimiter
+  uduino.println(targetValue);
+}
+
+// Servo functions
+void SetupServo(int pin) {
+  if (ServoConnectedPin(pin))
+    return;
+
+  int nextIndex = GetAvailableIndexByPin(-1);
+  if (nextIndex == -1)
+    nextIndex = 0;
+  servos[nextIndex].attach(pin);
+  servoPinMap[nextIndex] = pin;
+}
+
+void DisconnectServo(int pin) {
+  servos[GetAvailableIndexByPin(pin)].detach();
+  servoPinMap[GetAvailableIndexByPin(pin)] = 0;
+}
+
+bool ServoConnectedPin(int pin) {
+  return GetAvailableIndexByPin(pin) != -1;
+}
+
+int GetAvailableIndexByPin(int pin) {
+  for (int i = 0; i < MAXSERVOS - 1; i++) {
+    if (servoPinMap[i] == pin) {
+      return i;
+    } else if (pin == -1 && servoPinMap[i] < 0) {
+      return i; // return the first available index
+    }
+  }
+  return -1;
+}
+
+void UpdateServo(int pin, int targetValue) {
+  int index = GetAvailableIndexByPin(pin);
+  servos[index].write(targetValue);
+  delay(10);
+}
+
+void DisconnectAllServos() {
+  for (int i = 0; i < MAXSERVOS; i++) {
+    servos[i].detach();
+    digitalWrite(servoPinMap[i], LOW);
+    servoPinMap[i] = -1;
+  }
 }
