@@ -49,6 +49,8 @@ void loop() {
     int16_t gx, gy, gz;
 
     int lightValue = analogRead(lightSensorPin);
+
+    float remappedLightValue = map(lightValue, 60, 700, 0, 100) / 100.0;
     
     mpu.getAcceleration(&ax, &ay, &az);
     mpu.getRotation(&gx, &gy, &gz);
@@ -64,7 +66,7 @@ void loop() {
     uduino.print("|");
     uduino.print(gz);
     uduino.print("|");
-    uduino.println(lightValue);
+    uduino.println(remappedLightValue);
   }
   delay(100);
   /*int16_t ax, ay, az;
