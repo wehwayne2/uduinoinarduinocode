@@ -11,6 +11,8 @@ Uduino uduino("IMU");
 
 MPU6050 mpu;
 
+const int lightSensorPin = A0; // Analog pin connected to the light sensor
+
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
@@ -207,7 +209,14 @@ Servo myservo;
 
 void loop() {
   uduino.update();
+  if (uduino.isConnected()){
+    
+    int lightValue = analogRead(lightSensorPin);
 
+    uduino.println(lightValue);
+  }
+  delay(100);
+  
   if (uduino.isInit()) {
     if (!dmpReady) {
       Serial.println("IMU not connected.");
