@@ -4,12 +4,15 @@ Uduino uduino("IMU");
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
+#include "Ultrasonic.h"
 
 // Servo
 #include <Servo.h>
 #define MAXSERVOS 8
 
 MPU6050 mpu;
+
+Ultrasonic ultrasonic(7);// D7
 
 const int lightSensorPin = A0; // Analog pin connected to the light sensor
 
@@ -210,10 +213,17 @@ Servo myservo;
 void loop() {
   uduino.update();
   if (uduino.isConnected()){
-    
+    //lightsensor
     int lightValue = analogRead(lightSensorPin);
+    float remappedLightValue = map(lightValue, 20, 450, 0, 100) / 100;
+    //Ultrasonic Ranger
+    long RangeInCentimeters;
 
-    uduino.println(lightValue);
+    RangeInCentimeters = ultrasonic.MeasureInCentimeters(); // two measurements should keep an interval
+    //print to Uduino
+    uduino.print(RangeInCentimeters);//0~400cm
+    uduino.print("|");
+    uduino.println(remappedLightValue);
   }
   delay(100);
   
