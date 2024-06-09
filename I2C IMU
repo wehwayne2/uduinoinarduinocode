@@ -224,7 +224,7 @@ void loop() {
     if (uduino.isInit()) {
       if (!dmpReady) {
         Serial.println("IMU not connected.");
-        delay(10);
+        delay(50);
         return;
       }
 
@@ -254,7 +254,7 @@ void loop() {
       uduino.print("|");
     }
   }
-  delay(100);
+  delay(50);
 }
 
 
