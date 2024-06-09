@@ -212,48 +212,50 @@ Servo myservo;
 
 void loop() {
   uduino.update();
-  if (uduino.isConnected()){
-    //lightsensor
+  if (uduino.isConnected()) {
+    // lightsensor
     int lightValue = analogRead(lightSensorPin);
-    float remappedLightValue = map(lightValue, 20, 450, 0, 100) / 100;
-    //Ultrasonic Ranger
-    long RangeInCentimeters;
+    float remappedLightValue = map(lightValue, 20, 450, 0, 100);
 
-    RangeInCentimeters = ultrasonic.MeasureInCentimeters(); // two measurements should keep an interval
-    //print to Uduino
-    uduino.print(RangeInCentimeters);//0~400cm
-    uduino.print("|");
-    uduino.println(remappedLightValue);
+    // Ultrasonic Ranger
+    long RangeInCentimeters = ultrasonic.MeasureInCentimeters(); // two measurements should keep an interval
+
+    // Check if MPU is initialized
+    if (uduino.isInit()) {
+      if (!dmpReady) {
+        Serial.println("IMU not connected.");
+        delay(10);
+        return;
+      }
+
+      int mpuIntStatus = mpu.getIntStatus();
+      fifoCount = mpu.getFIFOCount();
+
+      if ((mpuIntStatus & 0x10) || fifoCount == 1024) { // check if overflow
+        mpu.resetFIFO();
+      } else if (mpuIntStatus & 0x02) {
+        while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
+
+        mpu.getFIFOBytes(fifoBuffer, packetSize);
+        fifoCount -= packetSize;
+
+        // Combine outputs into one line
+        uduino.print(RangeInCentimeters); // 0~400cm
+        uduino.print("|");
+        uduino.print(remappedLightValue);
+        uduino.print("|");
+        SendQuaternion(); // This function should handle its own printing
+      }
+    } else {
+      // Print values even if MPU is not initialized
+      uduino.print(RangeInCentimeters); // 0~400cm
+      uduino.print("|");
+      uduino.print(remappedLightValue);
+      uduino.print("|");
+    }
   }
   delay(100);
-  
-  if (uduino.isInit()) {
-    if (!dmpReady) {
-      Serial.println("IMU not connected.");
-      delay(10);
-      return;
-    }
-
-    int  mpuIntStatus = mpu.getIntStatus();
-    fifoCount = mpu.getFIFOCount();
-
-    if ((mpuIntStatus & 0x10) || fifoCount == 1024) { // check if overflow
-      mpu.resetFIFO();
-    } else if (mpuIntStatus & 0x02) {
-      while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
-
-      mpu.getFIFOBytes(fifoBuffer, packetSize);
-      fifoCount -= packetSize;
-
-      SendQuaternion();
-      //SendEuler();
-      //SendYawPitchRoll();
-      //SendRealAccel();
-      //SendWorldAccel();
-    }
-  }
 }
-
 
 
 void SendQuaternion() {
