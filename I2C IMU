@@ -14,6 +14,10 @@ MPU6050 mpu;
 
 Ultrasonic ultrasonic(7);// D7
 
+int MoPin = 9;    // vibrator Grove connected to digital pin 9
+
+int buzzer = 8; // Buzzer Pin
+
 const int lightSensorPin = A0; // Analog pin connected to the light sensor
 
 // MPU control/status vars
@@ -40,6 +44,10 @@ void setup() {
   Serial.begin(38400);
 
   while (!Serial); // wait for Leonardo enumeration, others continue immediately
+
+  pinMode( MoPin, OUTPUT );//Vibraition Motor
+
+  pinMode(buzzer,OUTPUT);//Buzzer
 
   mpu.initialize();
   devStatus = mpu.dmpInitialize();
