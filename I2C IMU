@@ -14,6 +14,11 @@ MPU6050 mpu;
 
 Ultrasonic ultrasonic(7);// D7
 
+unsigned long previousMillis100 = 0;
+unsigned long previousMillis10 = 0;
+const int delay100 = 100;
+const int delay10 = 10;
+
 const int lightSensorPin = A0; // Analog pin connected to the light sensor
 
 // MPU control/status vars
@@ -211,52 +216,55 @@ void BundleReadPin() {
 Servo myservo;
 
 void loop() {
-  uduino.update();
-  if (uduino.isConnected()) {
-    // lightsensor
-    int lightValue = analogRead(lightSensorPin);
-    float remappedLightValue = map(lightValue, 20, 450, 0, 100);
+  unsigned long currentMillis = millis();
 
-    // Ultrasonic Ranger
-    long RangeInCentimeters = ultrasonic.MeasureInCentimeters(); // two measurements should keep an interval
+  if (uduino.isInit()) {
+    if (!dmpReady) {
+      Serial.println("IMU not connected.");
+      delay(10);
+      return;
+    }
 
-    // Check if MPU is initialized
-    if (uduino.isInit()) {
-      if (!dmpReady) {
-        Serial.println("IMU not connected.");
-        delay(50);
-        return;
-      }
+    int mpuIntStatus = mpu.getIntStatus();
+    fifoCount = mpu.getFIFOCount();
 
-      int mpuIntStatus = mpu.getIntStatus();
-      fifoCount = mpu.getFIFOCount();
+    if ((mpuIntStatus & 0x10) || fifoCount == 1024) { // check if overflow
+      mpu.resetFIFO();
+    } else if (mpuIntStatus & 0x02) {
+      while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
 
-      if ((mpuIntStatus & 0x10) || fifoCount == 1024) { // check if overflow
-        mpu.resetFIFO();
-      } else if (mpuIntStatus & 0x02) {
-        while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
+      mpu.getFIFOBytes(fifoBuffer, packetSize);
+      fifoCount -= packetSize;
 
-        mpu.getFIFOBytes(fifoBuffer, packetSize);
-        fifoCount -= packetSize;
+      // Update every 100ms for RangeInCentimeters and remappedLightValue
+      if (currentMillis - previousMillis100 >= delay100) {
+        previousMillis100 = currentMillis;
 
-        // Combine outputs into one line
         uduino.print(RangeInCentimeters); // 0~400cm
         uduino.print("|");
         uduino.print(remappedLightValue);
         uduino.print("|");
+      }
+
+      // Update every 10ms for SendQuaternion
+      if (currentMillis - previousMillis10 >= delay10) {
+        previousMillis10 = currentMillis;
         SendQuaternion(); // This function should handle its own printing
       }
-    } else {
-      // Print values even if MPU is not initialized
+    }
+  } else {
+    // Print values even if MPU is not initialized
+    if (currentMillis - previousMillis100 >= delay100) {
+      previousMillis100 = currentMillis;
+
       uduino.print(RangeInCentimeters); // 0~400cm
       uduino.print("|");
       uduino.print(remappedLightValue);
       uduino.print("|");
     }
   }
-  delay(50);
+  // No delay here to allow non-blocking behavior
 }
-
 
 void SendQuaternion() {
   mpu.dmpGetQuaternion(&q, fifoBuffer);
