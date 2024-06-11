@@ -49,6 +49,8 @@ void setup() {
 
   pinMode(buzzer,OUTPUT);//Buzzer
 
+  digitalWrite(MoPin, LOW);
+
   mpu.initialize();
   devStatus = mpu.dmpInitialize();
   mpu.setXGyroOffset(54); //++
@@ -229,7 +231,24 @@ float remappedLightValue = 0.0;
 void loop() {
   uduino.update();
   
-  if (uduino.isConnected()) {
+  if (uduino.isConnected()) {  
+
+    if (MoPin == HIGH){
+      digitalWrite(MoPin, HIGH);
+    
+    // Wait for 1 second
+      delay(10);
+    
+      // Turn off the motor
+      digitalWrite(MoPin, LOW);
+       // Optional: Wait for the input pin to go LOW again before allowing the motor to run for another second
+       while (digitalRead(MoPin) == HIGH) {
+         digitalWrite(MoPin, LOW);
+      // Do nothing, just wait
+       }
+    }
+    delay(50);
+
     unsigned long currentMillis = millis();
 
     // Check if it's time to update light and range values
