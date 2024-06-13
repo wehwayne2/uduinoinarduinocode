@@ -259,7 +259,7 @@ void loop() {
 
       // Light Sensor
       int lightValue = analogRead(lightSensorPin);
-      remappedLightValue = map(lightValue, 20, 450, 0, 100);
+      remappedLightValue = map(lightValue, 0, 700, 0, 100);
 
       // Ultrasonic Ranger
       rangeInCentimeters = ultrasonic.MeasureInCentimeters(); // two measurements should keep an interval
