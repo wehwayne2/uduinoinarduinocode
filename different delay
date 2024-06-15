@@ -13,6 +13,8 @@ MPU6050 mpu;
 
 const int lightSensorPin = A0; // Analog pin connected to the light sensor
 
+int MoPin = 8;
+
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
@@ -70,6 +72,8 @@ void setup() {
   uduino.addCommand("b", ReadBundle);
   uduino.addInitFunction(DisconnectAllServos);
   uduino.addDisconnectedFunction(DisconnectAllServos);
+
+  digitalWrite(MoPin, LOW);
 }
 
 void ReadBundle() {
@@ -207,14 +211,26 @@ void BundleReadPin() {
 
 Servo myservo;
 
+unsigned long previousLightMillis = 0;
+unsigned long previousQuaternionMillis = 0;
+const unsigned long lightInterval = 100;
+const unsigned long quaternionInterval = 10;
+float lastRemappedLightValue = 0;
+
 void loop() {
   uduino.update();
+  
   if (uduino.isConnected()) {
-    // lightsensor
-    int lightValue = analogRead(lightSensorPin);
-    float remappedLightValue = map(lightValue, 20, 450, 0, 100);
+    unsigned long currentMillis = millis();
+    
+    if (currentMillis - previousLightMillis >= lightInterval) {
+      previousLightMillis = currentMillis;
+      
+      // Read light sensor and remap value
+      int lightValue = analogRead(lightSensorPin);
+      lastRemappedLightValue = map(lightValue, 20, 450, 0, 100);
+    }
 
-    // Check if MPU is initialized
     if (uduino.isInit()) {
       if (!dmpReady) {
         //Serial.println("IMU not connected.");
@@ -233,24 +249,27 @@ void loop() {
         mpu.getFIFOBytes(fifoBuffer, packetSize);
         fifoCount -= packetSize;
 
-        // Combine outputs into one line
-        uduino.print(remappedLightValue); // 0~400cm
-        uduino.print("|");
-        uduino.print(remappedLightValue);
-        uduino.print("|");
-        SendQuaternion(); // This function should handle its own printing
+        if (currentMillis - previousQuaternionMillis >= quaternionInterval) {
+          previousQuaternionMillis = currentMillis;
+
+          // Print remappedLightValue and quaternion in the same line
+          uduino.print(lastRemappedLightValue); // 0~100
+          uduino.print("|");
+          uduino.print(lastRemappedLightValue);
+          uduino.print("|");
+          SendQuaternion(); // This function should handle its own printing
+        }
       }
     } else {
-      // Print values even if MPU is not initialized
-      uduino.print(remappedLightValue); // 0~400cm
+      // Print remappedLightValue and placeholders for quaternion if MPU is not initialized
+      uduino.print(lastRemappedLightValue); // 0~100
       uduino.print("|");
-      uduino.print(remappedLightValue);
+      uduino.print(lastRemappedLightValue);
       uduino.print("|");
+      Serial.println("Quaternion not available");
     }
   }
-  delay(10);
 }
-
 
 
 void SendQuaternion() {
