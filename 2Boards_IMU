@@ -11,8 +11,9 @@ Uduino uduino("IMU");
 
 MPU6050 mpu;
 
-const int lightSensorPin = A0; // Analog pin connected to the light sensor
-
+const int lightSensor1Pin = A0; // Analog pin connected to the light sensor
+const int lightSensor2Pin = A1;
+const int lightSensor3Pin = A2;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -212,7 +213,9 @@ unsigned long previousLightMillis = 0;
 unsigned long previousQuaternionMillis = 0;
 const unsigned long lightInterval = 300;
 const unsigned long quaternionInterval = 10;
-float RemappedLightValue = 0;
+float RemappedLightValue1 = 0;
+float RemappedLightValue2 = 0;
+float RemappedLightValue3 = 0;
 
 void loop() {
   uduino.update();
@@ -224,8 +227,12 @@ void loop() {
       previousLightMillis = currentMillis;
       
       // Read light sensor and remap value
-      int lightValue = analogRead(lightSensorPin);
-      RemappedLightValue = map(lightValue, 20, 450, 0, 100);
+      int lightValue1 = analogRead(lightSensor1Pin);
+      int lightValue2 = analogRead(lightSensor2Pin);
+      int lightValue3 = analogRead(lightSensor3Pin);
+      RemappedLightValue1 = map(lightValue1, 20, 450, 0, 100);
+      RemappedLightValue2 = map(lightValue2, 0, 1024, 0, 100);
+      RemappedLightValue3 = map(lightValue3, 0, 1024, 0, 100);
     }
 
     if (uduino.isInit()) {
@@ -250,18 +257,22 @@ void loop() {
           previousQuaternionMillis = currentMillis;
 
           // Print remappedLightValue and quaternion in the same line
-          uduino.print(RemappedLightValue); // 0~100
+          uduino.print(RemappedLightValue1); // 0~100
           uduino.print("|");
-          uduino.print(RemappedLightValue);
+          uduino.print(RemappedLightValue2);
+          uduino.print("|");
+          uduino.print(RemappedLightValue3);
           uduino.print("|");
           SendQuaternion(); // This function should handle its own printing
         }
       }
     } else {
       // Print remappedLightValue and placeholders for quaternion if MPU is not initialized
-      uduino.print(RemappedLightValue); // 0~100
+      uduino.print(RemappedLightValue1); // 0~100
       uduino.print("|");
-      uduino.print(RemappedLightValue);
+      uduino.print(RemappedLightValue2);
+      uduino.print("|");
+      uduino.print(RemappedLightValue3);
       uduino.print("|");
     }
   }
