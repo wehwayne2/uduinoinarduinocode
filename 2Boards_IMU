@@ -259,9 +259,9 @@ void loop() {
           // Print remappedLightValue and quaternion in the same line
           uduino.print(RemappedLightValue1); // 0~100
           uduino.print("|");
-          uduino.print(RemappedLightValue2);
+          uduino.print(RemappedLightValue1);
           uduino.print("|");
-          uduino.print(RemappedLightValue3);
+          uduino.print(RemappedLightValue1);
           uduino.print("|");
           SendQuaternion(); // This function should handle its own printing
         }
@@ -270,9 +270,9 @@ void loop() {
       // Print remappedLightValue and placeholders for quaternion if MPU is not initialized
       uduino.print(RemappedLightValue1); // 0~100
       uduino.print("|");
-      uduino.print(RemappedLightValue2);
+      uduino.print(RemappedLightValue1);
       uduino.print("|");
-      uduino.print(RemappedLightValue3);
+      uduino.print(RemappedLightValue1);
       uduino.print("|");
     }
   }
