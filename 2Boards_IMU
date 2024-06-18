@@ -230,7 +230,7 @@ void loop() {
       int lightValue1 = analogRead(lightSensor1Pin);
       int lightValue2 = analogRead(lightSensor2Pin);
       int lightValue3 = analogRead(lightSensor3Pin);
-      RemappedLightValue1 = map(lightValue1, 20, 450, 0, 100);
+      RemappedLightValue1 = map(lightValue1, 0, 1024, 0, 100);
       RemappedLightValue2 = map(lightValue2, 0, 1024, 0, 100);
       RemappedLightValue3 = map(lightValue3, 0, 1024, 0, 100);
     }
