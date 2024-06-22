@@ -1,55 +1,28 @@
-/* ============================================
-I2Cdev device library code is placed under the MIT license
-Copyright (c) 2012 Jeff Rowberg
+#include<Uduino_Wifi.h>
+Uduino_Wifi uduino("IMU");
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-===============================================
-*/
-
-/* This driver reads quaternion data from the MPU6060 and sends
-   Open Sound Control messages.
-
-  GY-521  NodeMCU
-  MPU6050 devkit 1.0
-  board   Lolin         Description
-  ======= ==========    ====================================================
-  VCC     VU (5V USB)   Not available on all boards so use 3.3V if needed.
-  GND     G             Ground
-  SCL     D1 (GPIO05)   I2C clock
-  SDA     D2 (GPIO04)   I2C data
-  XDA     not connected
-  XCL     not connected
-  AD0     not connected
-  INT     D8 (GPIO15)   Interrupt pin
-
-*/
-#include "Uduino.h"  // Include Uduino library at the top of the sketch
-Uduino uduino("IMU");
+// Servo
+#if defined(ESP32)
+// Install esp32servo library => Sketch>Include Library>Manager Libraries>Esp32Servo
+#include <ESP32Servo.h>
+#else
+#include <Servo.h>
+#endif
 
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
-#include "Wire.h"
+
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+    #include "Wire.h"
+#endif
 
 MPU6050 mpu;
 
+#define MAXSERVOS 8
+
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
+uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
@@ -64,15 +37,17 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-#define INTERRUPT_PIN 15 // use pin 15 on ESP8266
-
 void setup() {
   Wire.begin();
   Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
 
   Serial.begin(115200);
 
-  while (!Serial); // wait for Leonardo enumeration, others continue immediately
+#if defined (__AVR_ATmega32U4__) // Leonardo
+  while (!Serial) {}
+#elif defined(__PIC32MX__)
+  delay(1000);
+#endif
 
   mpu.initialize();
   devStatus = mpu.dmpInitialize();
@@ -90,6 +65,10 @@ void setup() {
     // Error
     Serial.println("Error!");
   }
+  // Optional functions,  to add BEFORE connectWifi(...)
+  uduino.setPort(4222);   // default 4222
+  uduino.connectWifi("interface", "bonjourlemonde");
+  
 }
 
 void loop() {
@@ -113,6 +92,13 @@ void loop() {
       mpu.getFIFOBytes(fifoBuffer, packetSize);
       fifoCount -= packetSize;
 
+       uduino.print("2"); // 0~100
+       uduino.print("|");
+       uduino.print("2");
+       uduino.print("|");
+       uduino.print("2");
+       uduino.print("|");
+
       SendQuaternion();
       //SendEuler();
       //SendYawPitchRoll();
@@ -124,54 +110,11 @@ void loop() {
 
 void SendQuaternion() {
   mpu.dmpGetQuaternion(&q, fifoBuffer);
-  Serial.print("r/");
-  Serial.print(q.w, 4); Serial.print("/");
-  Serial.print(q.x, 4); Serial.print("/");
-  Serial.print(q.y, 4); Serial.print("/");
-  Serial.println(q.z, 4);
+  uduino.print("r/");
+  uduino.print(q.w, 4); uduino.print("/");
+  uduino.print(q.x, 4); uduino.print("/");
+  uduino.print(q.y, 4); uduino.print("/");
+  uduino.println(q.z, 4);
 }
 
-void SendEuler() {
-  // display Euler angles in degrees
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetEuler(euler, &q);
-  Serial.print(euler[0] * 180 / M_PI); Serial.print("/");
-  Serial.print(euler[1] * 180 / M_PI); Serial.print("/");
-  Serial.println(euler[2] * 180 / M_PI);
-}
 
-void SendYawPitchRoll() {
-  // display Euler angles in degrees
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-  Serial.print(ypr[0] * 180 / M_PI); Serial.print("/");
-  Serial.print(ypr[1] * 180 / M_PI); Serial.print("/");
-  Serial.println(ypr[2] * 180 / M_PI);
-}
-
-void SendRealAccel() {
-  // display real acceleration, adjusted to remove gravity
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetAccel(&aa, fifoBuffer);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-  Serial.print("a/");
-  Serial.print(aaReal.x); Serial.print("/");
-  Serial.print(aaReal.y); Serial.print("/");
-  Serial.println(aaReal.z);
-}
-
-void SendWorldAccel() {
-  // display initial world-frame acceleration, adjusted to remove gravity
-  // and rotated based on known orientation from quaternion
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetAccel(&aa, fifoBuffer);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-  mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-  Serial.print("a/");
-  Serial.print(aaWorld.x); Serial.print("/");
-  Serial.print(aaWorld.y); Serial.print("/");
-  Serial.println(aaWorld.z);
-}
