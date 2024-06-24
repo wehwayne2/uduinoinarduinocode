@@ -19,6 +19,8 @@ MPU6050 mpu;
 
 #define MAXSERVOS 8
 
+#define INTERRUPT_PIN 15 // use pin 15 on ESP8266
+
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -63,7 +65,7 @@ void setup() {
   }
 
   uduino.setPort(4222);   // default 4222
-  uduino.connectWifi("FRITZ!Box 5490 WG", "84019979887598316415");
+  uduino.connectWifi("interface", "bonjourlemonde");
 }
 
 void loop() {
