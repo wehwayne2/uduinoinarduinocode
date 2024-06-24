@@ -1,0 +1,51 @@
+#include <SPI.h>
+#include <Adafruit_MCP3008.h>
+
+// Define MCP3008 connections
+#define MCP_CS_PIN D8  // Chip select pin
+
+Adafruit_MCP3008 adc;
+
+void setup() {
+  Serial.begin(115200);
+  // Initialize MCP3008
+  adc.begin(MCP_CS_PIN);
+}
+
+void loop() {
+  // Read from channels 0, 1, and 2
+  int sensorValue1 = adc.readADC(0);
+  int sensorValue2 = adc.readADC(1);
+  int sensorValue3 = adc.readADC(2);
+  int sensorValue4 = adc.readADC(3);
+  int sensorValue5 = adc.readADC(4);
+  int sensorValue6 = adc.readADC(5);
+
+  // Map the sensor values from 400-1000 to 0-10
+  int mappedValue1 = map(sensorValue1, 400, 1000, 0, 10);
+  int mappedValue2 = map(sensorValue2, 400, 800, 0, 10);
+  int mappedValue3 = map(sensorValue3, 500, 1000, 0, 10);
+  int mappedValue4 = map(sensorValue4, 500, 800, 0, 10);
+  int mappedValue5 = map(sensorValue5, 400, 800, 0, 10);
+  int mappedValue6 = map(sensorValue6, 200, 400, 0, 10);
+  
+  // Ensure the mapped values are within bounds
+  mappedValue1 = constrain(mappedValue1, 0, 10);
+  mappedValue2 = constrain(mappedValue2, 0, 10);
+  mappedValue3 = constrain(mappedValue3, 0, 10);
+  mappedValue4 = constrain(mappedValue4, 0, 10);
+  mappedValue5 = constrain(mappedValue5, 0, 10);
+  mappedValue6 = constrain(mappedValue6, 0, 10);
+
+  // Print the mapped sensor values
+  Serial.print(sensorValue1); Serial.print('|');
+  Serial.print(sensorValue2); Serial.print('|');
+  Serial.print(sensorValue3); Serial.print('|');
+  Serial.print(sensorValue4); Serial.print('|');
+  Serial.print(sensorValue5); Serial.print('|');
+  Serial.println(sensorValue6);
+  
+  // Wait a bit before reading again
+  delay(300);
+}
+
