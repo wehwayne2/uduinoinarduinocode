@@ -77,66 +77,90 @@ void setup() {
   uduino.connectWifi("interface", "bonjourlemonde");
 }
 
+unsigned long previousLightMillis = 0;
+unsigned long previousQuaternionMillis = 0;
+const unsigned long lightInterval = 300;
+const unsigned long quaternionInterval = 50;
+int mappedValue1 = 0;
+int mappedValue2 = 0;
+int mappedValue3 = 0;
+int mappedValue4 = 0;
+int mappedValue5 = 0;
+int mappedValue6 = 0;
+
 void loop() {
   uduino.update();
 
-  if (uduino.isInit()) {
-    // Read from channels 0, 1, and 2
-  int sensorValue1 = adc.readADC(0);
-  int sensorValue2 = adc.readADC(1);
-  int sensorValue3 = adc.readADC(2);
-  int sensorValue4 = adc.readADC(3);
-  int sensorValue5 = adc.readADC(4);
-  int sensorValue6 = adc.readADC(5);
+   if (uduino.isConnected()) {
+    unsigned long currentMillis = millis();
+    
+    if (currentMillis - previousLightMillis >= lightInterval) {
+      previousLightMillis = currentMillis;
+      
+      // Read light sensor and remap value
+        int sensorValue1 = adc.readADC(0);
+        int sensorValue2 = adc.readADC(1);
+        int sensorValue3 = adc.readADC(2);
+        int sensorValue4 = adc.readADC(3);
+        int sensorValue5 = adc.readADC(4);
+        int sensorValue6 = adc.readADC(5);
 
-  // Map the sensor values from 400-1000 to 0-10
-  int mappedValue1 = map(sensorValue1, 400, 1000, 0, 10);
-  int mappedValue2 = map(sensorValue2, 400, 800, 0, 10);
-  int mappedValue3 = map(sensorValue3, 500, 1000, 0, 10);
-  int mappedValue4 = map(sensorValue4, 300, 800, 0, 10);
-  int mappedValue5 = map(sensorValue5, 300, 800, 0, 10);
-  int mappedValue6 = map(sensorValue6, 100, 400, 0, 10);
+        // Map the sensor values from 400-1000 to 0-10
+        mappedValue1 = map(sensorValue1, 400, 1000, 0, 10);
+        mappedValue2 = map(sensorValue2, 400, 800, 0, 10);
+        mappedValue3 = map(sensorValue3, 500, 1000, 0, 10);
+        mappedValue4 = map(sensorValue4, 300, 800, 0, 10);
+        mappedValue5 = map(sensorValue5, 300, 800, 0, 10);
+        mappedValue6 = map(sensorValue6, 100, 400, 0, 10);
   
-  // Ensure the mapped values are within bounds
-  mappedValue1 = constrain(mappedValue1, 0, 10);
-  mappedValue2 = constrain(mappedValue2, 0, 10);
-  mappedValue3 = constrain(mappedValue3, 0, 10);
-  mappedValue4 = constrain(mappedValue4, 0, 10);
-  mappedValue5 = constrain(mappedValue5, 0, 10);
-  mappedValue6 = constrain(mappedValue6, 0, 10);
-
-    if (!dmpReady) {
-      Serial.println("IMU not connected.");
-      delay(10);
-      return;
+        // Ensure the mapped values are within bounds
+        mappedValue1 = constrain(mappedValue1, 0, 10);
+        mappedValue2 = constrain(mappedValue2, 0, 10);
+        mappedValue3 = constrain(mappedValue3, 0, 10);
+        mappedValue4 = constrain(mappedValue4, 0, 10);
+        mappedValue5 = constrain(mappedValue5, 0, 10);
+        mappedValue6 = constrain(mappedValue6, 0, 10);
     }
 
-    mpuIntStatus = mpu.getIntStatus();
-    fifoCount = mpu.getFIFOCount();
+    if (uduino.isInit()) {
+      if (!dmpReady) {
+        //Serial.println("IMU not connected.");
+        delay(10);
+        return;
+      }
 
-    if ((mpuIntStatus & 0x10) || fifoCount == 1024) { // check for overflow
-      mpu.resetFIFO();
-    } else if (mpuIntStatus & 0x02) {
-      while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
+      int mpuIntStatus = mpu.getIntStatus();
+      fifoCount = mpu.getFIFOCount();
 
-      mpu.getFIFOBytes(fifoBuffer, packetSize);
-      fifoCount -= packetSize;
+      if ((mpuIntStatus & 0x10) || fifoCount == 1024) { // check if overflow
+        mpu.resetFIFO();
+      } else if (mpuIntStatus & 0x02) {
+        while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
 
-      // Print the mapped sensor values
-      uduino.print(mappedValue1); uduino.print('|');
-      uduino.print(mappedValue2); uduino.print('|');
-      uduino.print(mappedValue3); uduino.print('|');
-      uduino.print(mappedValue4); uduino.print('|');
-      uduino.print(mappedValue5); uduino.print('|');
-      uduino.print(mappedValue6); uduino.print('|');
+        mpu.getFIFOBytes(fifoBuffer, packetSize);
+        fifoCount -= packetSize;
 
-      SendQuaternion();
-      // SendEuler();
-      // SendYawPitchRoll();
-      // SendRealAccel();
-      // SendWorldAccel();
-      
-      delay(50); // Add delay to reduce transmission frequency
+        if (currentMillis - previousQuaternionMillis >= quaternionInterval) {
+          previousQuaternionMillis = currentMillis;
+
+          // Print the mapped sensor values
+          uduino.print(mappedValue1); uduino.print('|');
+          uduino.print(mappedValue2); uduino.print('|');
+          uduino.print(mappedValue3); uduino.print('|');
+          uduino.print(mappedValue4); uduino.print('|');
+          uduino.print(mappedValue5); uduino.print('|');
+          uduino.print(mappedValue6); uduino.print('|');
+          SendQuaternion(); // This function should handle its own printing
+        }
+      }
+    } else {
+       // Print remappedLightValue and placeholders for quaternion if MPU is not initialized
+       uduino.print(mappedValue1); uduino.print('|');
+       uduino.print(mappedValue2); uduino.print('|');
+       uduino.print(mappedValue3); uduino.print('|');
+       uduino.print(mappedValue4); uduino.print('|');
+       uduino.print(mappedValue5); uduino.print('|');
+       uduino.print(mappedValue6); uduino.print('|');
     }
   }
 }
