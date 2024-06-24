@@ -19,7 +19,7 @@ MPU6050 mpu;
 
 #define MAXSERVOS 8
 
-#define INTERRUPT_PIN 15 // use pin 15 on ESP8266
+#define INTERRUPT_PIN 16 // use pin 16 (D0) on ESP8266
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
