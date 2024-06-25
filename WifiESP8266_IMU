@@ -74,7 +74,7 @@ void setup() {
   }
 
   uduino.setPort(4222);   // default 4222
-  uduino.connectWifi("interface", "bonjourlemonde");
+  uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
 }
 
 unsigned long previousLightMillis = 0;
