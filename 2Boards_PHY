@@ -1,22 +1,30 @@
-// Uduino Default Board
-#include<Uduino.h>
-Uduino uduino("PHY"); // Declare and name your object
+#include<Uduino_Wifi.h>
+Uduino_Wifi uduino("PHY"); // Declare and name your object
 
 // Servo
+#if defined(ESP32)
+// Install esp32servo library => Sketch>Include Library>Manager Libraries>Esp32Servo
+#include <ESP32Servo.h>
+#else
 #include <Servo.h>
+#endif
+
 #define MAXSERVOS 8
 
-int MoPin = 13;   
+int MoPin = 15;  
 
 void setup()
 {
-  Serial.begin(38400);
-
+  Serial.begin(115200);
 #if defined (__AVR_ATmega32U4__) // Leonardo
   while (!Serial) {}
 #elif defined(__PIC32MX__)
   delay(1000);
 #endif
+
+  // Optional functions,  to add BEFORE connectWifi(...)
+  uduino.setPort(4888);   // default 4222
+  uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
 
   uduino.addCommand("s", SetMode);
   uduino.addCommand("d", WritePinDigital);
@@ -25,7 +33,8 @@ void setup()
   uduino.addCommand("r", ReadAnalogPin);
   uduino.addCommand("br", BundleReadPin);
   uduino.addCommand("b", ReadBundle);
-  uduino.addInitFunction(DisconnectAllServos);
+
+  uduino.addInitFunction(InitializeServos);
   uduino.addDisconnectedFunction(DisconnectAllServos);
 }
 
@@ -153,42 +162,44 @@ void BundleReadPin() {
   if (arg != NULL)
   {
     pinToRead = atoi(arg);
-    if (pinToRead != -1) {
-      if (pinToRead < 13)
-        printValue(pinToRead, digitalRead(pinToRead));
-      else
-        printValue(pinToRead, analogRead(pinToRead));
-    }
+    if (pinToRead != -1)
+      printValue(pinToRead, analogRead(pinToRead));
   }
 }
 
-Servo myservo;
 void loop()
 {
   uduino.update();
+  //delay(10);
 }
 
 void printValue(int pin, int targetValue) {
   uduino.print(pin);
   uduino.print(" "); //<- Todo : Change that with Uduino delimiter
   uduino.println(targetValue);
-  // TODO : Here we could put bundle read multiple pins if(Bundle) { ... add delimiter // } ...
 }
-
 
 
 
 /* SERVO CODE */
 Servo servos[MAXSERVOS];
 int servoPinMap[MAXSERVOS];
-/*
-  void InitializeServos() {
+
+void InitializeServos() {
+#if defined(ESP32)
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+#else
+#endif
+
   for (int i = 0; i < MAXSERVOS - 1; i++ ) {
     servoPinMap[i] = -1;
     servos[i].detach();
   }
-  }
-*/
+}
+
 void SetupServo(int pin) {
   if (ServoConnectedPin(pin))
     return;
@@ -196,7 +207,11 @@ void SetupServo(int pin) {
   int nextIndex = GetAvailableIndexByPin(-1);
   if (nextIndex == -1)
     nextIndex = 0;
+#if defined(ESP32)
+  servos[nextIndex].setPeriodHertz(50);
+#endif
   servos[nextIndex].attach(pin);
+
   servoPinMap[nextIndex] = pin;
 }
 
