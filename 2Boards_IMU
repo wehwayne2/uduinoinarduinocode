@@ -1,44 +1,63 @@
-#include "Uduino.h"  // Include Uduino library at the top of the sketch
-Uduino uduino("IMU");
+#include <Uduino_Wifi.h>
+Uduino_Wifi uduino("IMU");
+
+// Servo
+#if defined(ESP32)
+#include <ESP32Servo.h>
+#else
+#include <Servo.h>
+#endif
 
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
-#include "Wire.h"
+#include <SPI.h>
+#include <Adafruit_MCP3008.h>
 
-// Servo
-#include <Servo.h>
-#define MAXSERVOS 8
+// Define MCP3008 connections
+#define MCP_CS_PIN D8  // Chip select pin
+
+Adafruit_MCP3008 adc;
+
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+#include "Wire.h"
+#endif
 
 MPU6050 mpu;
 
-const int lightSensor1Pin = A0; // Analog pin connected to the light sensor
-const int lightSensor2Pin = A1;
-const int lightSensor3Pin = A2;
+#define MAXSERVOS 8
+
+#define INTERRUPT_PIN 16 // use pin 16 (D0) on ESP8266
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
+uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 
 // orientation/motion vars
-Quaternion q;           // [w, x, y, z]         quaternion container
-VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
-VectorFloat gravity;    // [x, y, z]            gravity vector
-float euler[3];         // [psi, theta, phi]    Euler angle container
-float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-
+Quaternion q;           // [w, x, y, z] quaternion container
+VectorInt16 aa;         // [x, y, z] accel sensor measurements
+VectorInt16 aaReal;     // [x, y, z] gravity-free accel sensor measurements
+VectorInt16 aaWorld;    // [x, y, z] world-frame accel sensor measurements
+VectorFloat gravity;    // [x, y, z] gravity vector
+float euler[3];         // [psi, theta, phi] Euler angle container
+float ypr[3];           // [yaw, pitch, roll] yaw/pitch/roll container and gravity vector
 
 void setup() {
   Wire.begin();
-  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+  Wire.setClock(400000); // 400kHz I2C clock
 
-  Serial.begin(38400);
+  Serial.begin(115200);
 
-  while (!Serial); // wait for Leonardo enumeration, others continue immediately
+  adc.begin(MCP_CS_PIN);// Initialize MCP3008
+
+#if defined(__AVR_ATmega32U4__) // Leonardo
+  while (!Serial) {}
+#elif defined(__PIC32MX__)
+  delay(1000);
+#endif
 
   mpu.initialize();
   devStatus = mpu.dmpInitialize();
@@ -48,191 +67,59 @@ void setup() {
 
   if (devStatus == 0) {
     mpu.setDMPEnabled(true);
-    // set our DMP Ready flag so the main loop() function knows it's okay to use it
     dmpReady = true;
-    // get expected DMP packet size for later comparison
     packetSize = mpu.dmpGetFIFOPacketSize();
   } else {
-    // Error
     Serial.println("Error!");
   }
 
-  #if defined (__AVR_ATmega32U4__) // Leonardo
-  while (!Serial) {}
-#elif defined(__PIC32MX__)
-  delay(1000);
-#endif
-
-  uduino.addCommand("s", SetMode);
-  uduino.addCommand("d", WritePinDigital);
-  uduino.addCommand("a", WritePinAnalog);
-  uduino.addCommand("rd", ReadDigitalPin);
-  uduino.addCommand("r", ReadAnalogPin);
-  uduino.addCommand("br", BundleReadPin);
-  uduino.addCommand("b", ReadBundle);
-  uduino.addInitFunction(DisconnectAllServos);
-  uduino.addDisconnectedFunction(DisconnectAllServos);
+  uduino.setPort(4222);   // default 4222
+  uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
 }
-
-void ReadBundle() {
-  char *arg = NULL;
-  char *number = NULL;
-  number = uduino.next();
-  int len = 0;
-  if (number != NULL)
-    len = atoi(number);
-  for (int i = 0; i < len; i++) {
-    uduino.launchCommand(arg);
-  }
-}
-
-void SetMode() {
-  int pinToMap = 100; //100 is never reached
-  char *arg = NULL;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    pinToMap = atoi(arg);
-  }
-  int type;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    type = atoi(arg);
-    PinSetMode(pinToMap, type);
-  }
-}
-
-void PinSetMode(int pin, int type) {
-  //TODO : vérifier que ça, ça fonctionne
-  if (type != 4)
-    DisconnectServo(pin);
-
-  switch (type) {
-    case 0: // Output
-      pinMode(pin, OUTPUT);
-      break;
-    case 1: // PWM
-      pinMode(pin, OUTPUT);
-      break;
-    case 2: // Analog
-      pinMode(pin, INPUT);
-      break;
-    case 3: // Input_Pullup
-      pinMode(pin, INPUT_PULLUP);
-      break;
-    case 4: // Servo
-      SetupServo(pin);
-      break;
-  }
-}
-
-void WritePinAnalog() {
-  int pinToMap = 100;
-  char *arg = NULL;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    pinToMap = atoi(arg);
-  }
-
-  int valueToWrite;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    valueToWrite = atoi(arg);
-
-    if (ServoConnectedPin(pinToMap)) {
-      UpdateServo(pinToMap, valueToWrite);
-    } else {
-      analogWrite(pinToMap, valueToWrite);
-    }
-  }
-}
-
-void WritePinDigital() {
-  int pinToMap = -1;
-  char *arg = NULL;
-  arg = uduino.next();
-  if (arg != NULL)
-    pinToMap = atoi(arg);
-
-  int writeValue;
-  arg = uduino.next();
-  if (arg != NULL && pinToMap != -1)
-  {
-    writeValue = atoi(arg);
-    digitalWrite(pinToMap, writeValue);
-  }
-}
-
-void ReadAnalogPin() {
-  int pinToRead = -1;
-  char *arg = NULL;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    pinToRead = atoi(arg);
-    if (pinToRead != -1)
-      printValue(pinToRead, analogRead(pinToRead));
-  }
-}
-
-void ReadDigitalPin() {
-  int pinToRead = -1;
-  char *arg = NULL;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    pinToRead = atoi(arg);
-  }
-
-  if (pinToRead != -1)
-    printValue(pinToRead, digitalRead(pinToRead));
-}
-
-void BundleReadPin() {
-  int pinToRead = -1;
-  char *arg = NULL;
-  arg = uduino.next();
-  if (arg != NULL)
-  {
-    pinToRead = atoi(arg);
-    if (pinToRead != -1) {
-      if (pinToRead < 13)
-        printValue(pinToRead, digitalRead(pinToRead));
-      else
-        printValue(pinToRead, analogRead(pinToRead));
-    }
-  }
-}
-
-Servo myservo;
 
 unsigned long previousLightMillis = 0;
 unsigned long previousQuaternionMillis = 0;
 const unsigned long lightInterval = 300;
-const unsigned long quaternionInterval = 10;
-float RemappedLightValue1 = 0;
-float RemappedLightValue2 = 0;
-float RemappedLightValue3 = 0;
+const unsigned long quaternionInterval = 70;
+int mappedValue1 = 0;
+int mappedValue2 = 0;
+int mappedValue3 = 0;
+int mappedValue4 = 0;
+int mappedValue5 = 0;
+int mappedValue6 = 0;
 
 void loop() {
   uduino.update();
-  
-  if (uduino.isConnected()) {
+
+   if (uduino.isConnected()) {
     unsigned long currentMillis = millis();
     
     if (currentMillis - previousLightMillis >= lightInterval) {
       previousLightMillis = currentMillis;
       
       // Read light sensor and remap value
-      int lightValue1 = analogRead(lightSensor1Pin);
-      int lightValue2 = analogRead(lightSensor2Pin);
-      int lightValue3 = analogRead(lightSensor3Pin);
-      RemappedLightValue1 = map(lightValue1, 0, 1024, 0, 100);
-      RemappedLightValue2 = map(lightValue2, 0, 1024, 0, 100);
-      RemappedLightValue3 = map(lightValue3, 0, 1024, 0, 100);
+        int sensorValue1 = adc.readADC(0);
+        int sensorValue2 = adc.readADC(1);
+        int sensorValue3 = adc.readADC(2);
+        int sensorValue4 = adc.readADC(3);
+        int sensorValue5 = adc.readADC(4);
+        int sensorValue6 = adc.readADC(5);
+
+        // Map the sensor values from 400-1000 to 0-10
+        mappedValue1 = map(sensorValue1, 500, 1000, 0, 10);
+        mappedValue2 = map(sensorValue2, 500, 1000, 0, 10);
+        mappedValue3 = map(sensorValue3, 500, 1000, 0, 10);
+        mappedValue4 = map(sensorValue4, 500, 1000, 0, 10);
+        mappedValue5 = map(sensorValue5, 500, 1000, 0, 10);
+        mappedValue6 = map(sensorValue6, 500, 1000, 0, 10);
+  
+        // Ensure the mapped values are within bounds
+        mappedValue1 = constrain(mappedValue1, 0, 10);
+        mappedValue2 = constrain(mappedValue2, 0, 10);
+        mappedValue3 = constrain(mappedValue3, 0, 10);
+        mappedValue4 = constrain(mappedValue4, 0, 10);
+        mappedValue5 = constrain(mappedValue5, 0, 10);
+        mappedValue6 = constrain(mappedValue6, 0, 10);
     }
 
     if (uduino.isInit()) {
@@ -256,103 +143,33 @@ void loop() {
         if (currentMillis - previousQuaternionMillis >= quaternionInterval) {
           previousQuaternionMillis = currentMillis;
 
-          // Print remappedLightValue and quaternion in the same line
-          uduino.print(RemappedLightValue1); // 0~100
-          uduino.print("|");
-          uduino.print(RemappedLightValue1);
-          uduino.print("|");
-          uduino.print(RemappedLightValue1);
-          uduino.print("|");
+          // Print the mapped sensor values
+          uduino.print(mappedValue1); uduino.print('|');
+          uduino.print(mappedValue2); uduino.print('|');
+          uduino.print(mappedValue3); uduino.print('|');
+          uduino.print(mappedValue4); uduino.print('|');
+          uduino.print(mappedValue5); uduino.print('|');
+          uduino.print(mappedValue6); uduino.print('|');
           SendQuaternion(); // This function should handle its own printing
         }
       }
     } else {
-      // Print remappedLightValue and placeholders for quaternion if MPU is not initialized
-      uduino.print(RemappedLightValue1); // 0~100
-      uduino.print("|");
-      uduino.print(RemappedLightValue1);
-      uduino.print("|");
-      uduino.print(RemappedLightValue1);
-      uduino.print("|");
+       // Print remappedLightValue and placeholders for quaternion if MPU is not initialized
+       uduino.print(mappedValue1); uduino.print('|');
+       uduino.print(mappedValue2); uduino.print('|');
+       uduino.print(mappedValue3); uduino.print('|');
+       uduino.print(mappedValue4); uduino.print('|');
+       uduino.print(mappedValue5); uduino.print('|');
+       uduino.print(mappedValue6); uduino.print('|');
     }
   }
 }
-
 
 void SendQuaternion() {
   mpu.dmpGetQuaternion(&q, fifoBuffer);
-  Serial.print("r/");
-  Serial.print(q.w, 4); Serial.print("/");
-  Serial.print(q.x, 4); Serial.print("/");
-  Serial.print(q.y, 4); Serial.print("/");
-  Serial.println(q.z, 4);
-}
-
-
-void printValue(int pin, int targetValue) {
-  uduino.print(pin);
-  uduino.print(" "); //<- Todo : Change that with Uduino delimiter
-  uduino.println(targetValue);
-  // TODO : Here we could put bundle read multiple pins if(Bundle) { ... add delimiter // } ...
-}
-
-
-
-
-/* SERVO CODE */
-Servo servos[MAXSERVOS];
-int servoPinMap[MAXSERVOS];
-/*
-  void InitializeServos() {
-  for (int i = 0; i < MAXSERVOS - 1; i++ ) {
-    servoPinMap[i] = -1;
-    servos[i].detach();
-  }
-  }
-*/
-void SetupServo(int pin) {
-  if (ServoConnectedPin(pin))
-    return;
-
-  int nextIndex = GetAvailableIndexByPin(-1);
-  if (nextIndex == -1)
-    nextIndex = 0;
-  servos[nextIndex].attach(pin);
-  servoPinMap[nextIndex] = pin;
-}
-
-
-void DisconnectServo(int pin) {
-  servos[GetAvailableIndexByPin(pin)].detach();
-  servoPinMap[GetAvailableIndexByPin(pin)] = 0;
-}
-
-bool ServoConnectedPin(int pin) {
-  if (GetAvailableIndexByPin(pin) == -1) return false;
-  else return true;
-}
-
-int GetAvailableIndexByPin(int pin) {
-  for (int i = 0; i < MAXSERVOS - 1; i++ ) {
-    if (servoPinMap[i] == pin) {
-      return i;
-    } else if (pin == -1 && servoPinMap[i] < 0) {
-      return i; // return the first available index
-    }
-  }
-  return -1;
-}
-
-void UpdateServo(int pin, int targetValue) {
-  int index = GetAvailableIndexByPin(pin);
-  servos[index].write(targetValue);
-  delay(10);
-}
-
-void DisconnectAllServos() {
-  for (int i = 0; i < MAXSERVOS; i++) {
-    servos[i].detach();
-    digitalWrite(servoPinMap[i], LOW);
-    servoPinMap[i] = -1;
-  }
+  uduino.print("r/");
+  uduino.print(q.w, 4); uduino.print("/");
+  uduino.print(q.x, 4); uduino.print("/");
+  uduino.print(q.y, 4); uduino.print("/");
+  uduino.println(q.z, 4);
 }
