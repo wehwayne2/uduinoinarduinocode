@@ -24,7 +24,7 @@ void setup()
 
   // Optional functions,  to add BEFORE connectWifi(...)
   uduino.setPort(4888);   // default 4222
-  uduino.connectWifi("FRITZ!Box 5490 WG", "84019979887598316415");
+  uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
 
   uduino.addCommand("s", SetMode);
   uduino.addCommand("d", WritePinDigital);
