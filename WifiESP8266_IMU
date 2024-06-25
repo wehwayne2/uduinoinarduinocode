@@ -80,7 +80,7 @@ void setup() {
 unsigned long previousLightMillis = 0;
 unsigned long previousQuaternionMillis = 0;
 const unsigned long lightInterval = 300;
-const unsigned long quaternionInterval = 50;
+const unsigned long quaternionInterval = 70;
 int mappedValue1 = 0;
 int mappedValue2 = 0;
 int mappedValue3 = 0;
