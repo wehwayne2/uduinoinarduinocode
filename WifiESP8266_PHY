@@ -11,8 +11,6 @@ Uduino_Wifi uduino("PHY"); // Declare and name your object
 
 #define MAXSERVOS 8
 
-int MoPin = 15;  
-
 void setup()
 {
   Serial.begin(115200);
