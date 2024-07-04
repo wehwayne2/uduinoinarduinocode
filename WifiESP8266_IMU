@@ -65,7 +65,7 @@ void setup() {
     Serial.println("Error!");
   }
 
-  uduino.setPort(4888);   // default 4222
+  uduino.setPort(4222);   // default 4222
   uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
   
   uduino.addCommand("s", SetMode);
@@ -233,7 +233,7 @@ void loop() {
       
       // SendEuler();
       // SendYawPitchRoll();
-      SendRealAccel();
+      //SendRealAccel();
       // SendWorldAccel();
       SendQuaternion();
       
