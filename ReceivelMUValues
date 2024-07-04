@@ -5,56 +5,80 @@ public class ReceiveIMUValues : MonoBehaviour {
 
     Vector3 position;
     Vector3 rotation;
-    public Vector3 rotationOffset;
+    public Vector3 rotationOffset ;
     public float speedFactor = 15.0f;
     public string imuName = "r"; // You should ignore this if there is one IMU.
 
-    void Start() {
-        // Note that here, we don't use the delegate but the Events, assigned in the Inspector Panel
-        UduinoManager.Instance.OnDataReceived += ReadIMU;
+    private Quaternion targetQuat;
+    private Quaternion smoothQuat;
+    private Quaternion quatVelocity;
+    private float smoothtime = 0.09f;
+
+
+    void Start () {
+      //  UduinoManager.Instance.OnDataReceived += ReadIMU;
+      //  Note that here, we don't use the delegate but the Events, assigned in the Inpsector Panel
     }
 
-    void Update() {
-        // Update logic if necessary
-    }
+    void Update() { }
 
-    public void ReadIMU(string data, UduinoDevice device) {
-        // Debug.Log(data);
+    public void ReadIMU (string data, UduinoDevice device) {
+        //Debug.Log(data);
+        string[] values = data.Split('/');
+        if (values.Length == 5 && values[0] == imuName) // Rotation of the first one 
+        {
+            float w = float.Parse(values[1]);
+            float x = float.Parse(values[2]);
+            float y = float.Parse(values[3]);
+            float z = float.Parse(values[4]);
 
-        // Split by '|'
-        string[] parts = data.Split('|');
-        if (parts.Length == 3) {
-            string imuData = parts[2]; // Get the IMU part of the message
 
-            // Split the IMU data by '/'
-            string[] values = imuData.Split('/');
-            if (values.Length == 5 && values[0] == imuName) // Rotation of the first one 
-            {
-                try
-                {
-                    float w = float.Parse(values[1]);
-                    float x = float.Parse(values[2]);
-                    float y = float.Parse(values[3]);
-                    float z = float.Parse(values[4]);
+            targetQuat = Quaternion.Lerp(this.transform.localRotation, new Quaternion(w, y, x, z), Time.deltaTime * speedFactor);
+            smoothQuat = QuatSmoothDamp(smoothQuat, targetQuat, ref quatVelocity, smoothtime);
 
-                    // Correctly apply the quaternion rotation
-                    Quaternion targetRotation = new Quaternion(w, y, x, z);
-                    this.transform.localRotation = Quaternion.Lerp(this.transform.localRotation, targetRotation, Time.deltaTime * speedFactor);
-                }
-                catch (System.FormatException e)
-                {
-                    Debug.LogError("Failed to parse IMU data: " + imuData + " - " + e.Message);
-                }
-            }
-            else
-            {
-                Debug.LogWarning("Unexpected IMU data format: " + imuData);
-            }
-        } else {
-            Debug.LogWarning("Unexpected data format: " + data);
+
+            //this.transform.localRotation = Quaternion.Lerp(this.transform.localRotation,  new Quaternion(w, y, x, z), Time.deltaTime * speedFactor);
+            this.transform.localRotation = smoothQuat;
+
+
+
+
+		} else if (values.Length != 5)
+        {
+            Debug.LogWarning(data);
         }
-
-        // Apply the rotation offset to the parent object
         this.transform.parent.transform.eulerAngles = rotationOffset;
+      //  Log.Debug("The new rotation is : " + transform.Find("IMU_Object").eulerAngles);
     }
+
+	public static Quaternion QuatSmoothDamp(Quaternion rot, Quaternion target, ref Quaternion deriv, float time)
+	{
+		if (Time.deltaTime < Mathf.Epsilon) return rot;
+		// account for double-cover
+		var Dot = Quaternion.Dot(rot, target);
+		var Multi = Dot > 0f ? 1f : -1f;
+		target.x *= Multi;
+		target.y *= Multi;
+		target.z *= Multi;
+		target.w *= Multi;
+		// smooth damp (nlerp approx)
+		var Result = new Vector4(
+			Mathf.SmoothDamp(rot.x, target.x, ref deriv.x, time),
+			Mathf.SmoothDamp(rot.y, target.y, ref deriv.y, time),
+			Mathf.SmoothDamp(rot.z, target.z, ref deriv.z, time),
+			Mathf.SmoothDamp(rot.w, target.w, ref deriv.w, time)
+		).normalized;
+
+		// ensure deriv is tangent
+		var derivError = Vector4.Project(new Vector4(deriv.x, deriv.y, deriv.z, deriv.w), Result);
+		deriv.x -= derivError.x;
+		deriv.y -= derivError.y;
+		deriv.z -= derivError.z;
+		deriv.w -= derivError.w;
+
+		return new Quaternion(Result.x, Result.y, Result.z, Result.w);
+	}
+
+
+
 }
