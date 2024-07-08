@@ -176,11 +176,8 @@ void BundleReadPin() {
 void loop()
 { 
   setColor(255, 0, 0); // Red
-  delay(1000);
   setColor(0, 255, 0); // Green
-  delay(1000);
   setColor(0, 0, 255); // Blue
-  delay(1000);
   uduino.update();
   //delay(10);
 }
@@ -196,6 +193,7 @@ void setColor(int red, int green, int blue) {
   analogWrite(RED_PIN, red);
   analogWrite(GREEN_PIN, green);
   analogWrite(BLUE_PIN, blue);
+  delay(1000);
 }
 
 /* SERVO CODE */
