@@ -11,6 +11,10 @@ Uduino_Wifi uduino("PHY"); // Declare and name your object
 
 #define MAXSERVOS 8
 
+#define RED_PIN 14
+#define GREEN_PIN 12
+#define BLUE_PIN 13
+
 void setup()
 {
   Serial.begin(115200);
@@ -20,6 +24,10 @@ void setup()
   delay(1000);
 #endif
 
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
+  
   // Optional functions,  to add BEFORE connectWifi(...)
   uduino.setPort(4888);   // default 4222
   uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
@@ -168,7 +176,14 @@ void BundleReadPin() {
 void loop()
 {
   uduino.update();
+  setColor(255, 0, 255); // Magenta
   //delay(10);
+}
+
+void setColor(int red, int green, int blue) {
+  analogWrite(RED_PIN, red);
+  analogWrite(GREEN_PIN, green);
+  analogWrite(BLUE_PIN, blue);
 }
 
 void printValue(int pin, int targetValue) {
