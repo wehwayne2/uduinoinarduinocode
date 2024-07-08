@@ -11,10 +11,16 @@ Uduino_Wifi uduino("PHY"); // Declare and name your object
 
 #define MAXSERVOS 8
 
-int MoPin = 15;  
+#define RED_PIN 14
+#define GREEN_PIN 12
+#define BLUE_PIN 13
 
 void setup()
 {
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
+  
   Serial.begin(115200);
 #if defined (__AVR_ATmega32U4__) // Leonardo
   while (!Serial) {}
@@ -168,7 +174,13 @@ void BundleReadPin() {
 }
 
 void loop()
-{
+{ 
+  setColor(255, 0, 0); // Red
+  delay(1000);
+  setColor(0, 255, 0); // Green
+  delay(1000);
+  setColor(0, 0, 255); // Blue
+  delay(1000);
   uduino.update();
   //delay(10);
 }
@@ -179,7 +191,12 @@ void printValue(int pin, int targetValue) {
   uduino.println(targetValue);
 }
 
-
+//rgb led
+void setColor(int red, int green, int blue) {
+  analogWrite(RED_PIN, red);
+  analogWrite(GREEN_PIN, green);
+  analogWrite(BLUE_PIN, blue);
+}
 
 /* SERVO CODE */
 Servo servos[MAXSERVOS];
