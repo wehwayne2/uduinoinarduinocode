@@ -30,7 +30,7 @@ void setup()
   
   // Optional functions,  to add BEFORE connectWifi(...)
   uduino.setPort(4888);   // default 4222
-  uduino.connectWifi("EasyBox-640692", "ZiDTuMtLdMMXB5HX");
+  uduino.connectWifi("interface", "bonjourlemonde");
 
   uduino.addCommand("s", SetMode);
   uduino.addCommand("d", WritePinDigital);
