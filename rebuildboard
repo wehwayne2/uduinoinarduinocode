@@ -82,7 +82,7 @@ void setup() {
   }
 
   uduino.setPort(4222);   // default 4222
-  uduino.connectWifi("Wei", "22222222");
+  uduino.connectWifi("WLAN Settings...", "22222222");
   
   uduino.addCommand("s", SetMode);
   uduino.addCommand("d", WritePinDigital);
@@ -273,12 +273,12 @@ void loop() {
         mappedValue6 = map(sensorValue6, 0, 20, 0, 200);
   
         // Ensure the mapped values are within bounds
-        mappedValue1 = constrain(mappedValue1, 0, 100);
-        mappedValue2 = constrain(mappedValue2, 0, 100);
-        mappedValue3 = constrain(mappedValue3, 0, 100);
-        mappedValue4 = constrain(mappedValue4, 0, 100);
-        mappedValue5 = constrain(mappedValue5, 0, 100);
-        mappedValue6 = constrain(mappedValue6, 0, 100);
+        mappedValue1 = constrain(mappedValue1, 0, 200);
+        mappedValue2 = constrain(mappedValue2, 0, 200);
+        mappedValue3 = constrain(mappedValue3, 0, 200);
+        mappedValue4 = constrain(mappedValue4, 0, 200);
+        mappedValue5 = constrain(mappedValue5, 0, 200);
+        mappedValue6 = constrain(mappedValue6, 0, 200);
     }
 
     if (uduino.isInit()) {
@@ -310,6 +310,7 @@ void loop() {
           uduino.print(mappedValue5); uduino.print('|');
           uduino.print(mappedValue6); uduino.print('|');
           SendQuaternion(); // This function should handle its own printing
+          SendWorldAccel();
         }
       }
     } else {
@@ -331,7 +332,21 @@ void SendQuaternion() {
   uduino.print(q.w, 4); uduino.print("/");
   uduino.print(q.x, 4); uduino.print("/");
   uduino.print(q.y, 4); uduino.print("/");
-  uduino.println(q.z, 4);
+  uduino.print(q.z, 4);
+}
+
+void SendWorldAccel() {
+  // display initial world-frame acceleration, adjusted to remove gravity
+  // and rotated based on known orientation from quaternion
+  mpu.dmpGetQuaternion(&q, fifoBuffer);
+  mpu.dmpGetAccel(&aa, fifoBuffer);
+  mpu.dmpGetGravity(&gravity, &q);
+  mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+  mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
+  uduino.print("/a/");
+  uduino.print(aaWorld.x); uduino.print("/");
+  uduino.print(aaWorld.y); uduino.print("/");
+  uduino.println(aaWorld.z);
 }
 
 void printValue(int pin, int targetValue) {
